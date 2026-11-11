@@ -93,7 +93,11 @@ async function main() {
   assert.ok(pubHtml.includes('Accept quote'));
   console.log('✓ send_quote, public link live');
 
-  const respond = await fetch(`${q.client_url}/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'accept', name: 'Sam Rivera' }) });
+  const wrong = await fetch(`${q.client_url}/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'accept', name: 'Someone Else' }) });
+  assert.equal(wrong.status, 400);
+  assert.ok((await wrong.json()).error.includes('Sam Rivera'));
+  console.log('✓ wrong signature name rejected');
+  const respond = await fetch(`${q.client_url}/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'accept', name: '  sam   RIVERA ' }) });
   assert.equal(respond.status, 200);
   const after = await call('get_quote', { quote: q.number });
   assert.equal(after.structuredContent.status, 'accepted');
