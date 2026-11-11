@@ -1,0 +1,15 @@
+{
+  "name": "quotelink",
+  "version": "1.0.0",
+  "description": "Client quotes written by your Claude (via MCP), edited and e-signed in QuoteLink. No AI inside.",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "test": "node --disable-warning=ExperimentalWarning test/smoke.js"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "license": "UNLICENSED"
+}
