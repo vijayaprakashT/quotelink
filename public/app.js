@@ -245,7 +245,15 @@
       });
     });
     var nameInput = $('form[data-action="accept"] input[name="name"]');
-    if (nameInput) nameInput.addEventListener('input', function () { $('#sig').textContent = nameInput.value; });
+    var norm = function (s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); };
+    if (nameInput) nameInput.addEventListener('input', function () {
+      $('#sig').textContent = nameInput.value;
+      var hint = $('#sig-hint');
+      if (!QL.signer || !nameInput.value.trim()) { hint.textContent = ''; return; }
+      var ok = norm(nameInput.value) === norm(QL.signer);
+      hint.textContent = ok ? '✓ Name matches the quote' : 'Must match the name on the quote: ' + QL.signer;
+      hint.style.color = ok ? 'var(--green)' : 'var(--red)';
+    });
     $$('.resp-form').forEach(function (f) {
       f.addEventListener('submit', function (e) {
         e.preventDefault();
