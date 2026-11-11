@@ -36,6 +36,8 @@
     });
   }
 
+  function loggedOut(err) { if (err && /log in/i.test(err.message)) location.href = '/login'; }
+
   // Copy buttons
   $$('[data-copy]').forEach(function (btn) {
     btn.addEventListener('click', function (e) {
@@ -63,8 +65,9 @@
     setInterval(function () {
       if (document.hidden) return;
       api('GET', '/app/api/rev').then(function (d) {
+        if (d.loggedOut) { location.href = '/login'; return; }
         if (d.rev !== QL.rev) location.reload();
-      }).catch(function () {});
+      }).catch(loggedOut);
     }, 3000);
   }
 
@@ -74,9 +77,11 @@
     var items = (QL.items || []).map(function (x) { return Object.assign({}, x); });
     var tbody = $('#items');
     var dirty = false;
+    var changed = {}; // fields edited here since the last save (so we never overwrite Claude's edits)
     var locked = !!QL.locked;
     var setDirty = function (v) {
       dirty = v;
+      if (!v) changed = {};
       var s = $('#savestate');
       if (s) { s.textContent = v ? 'Unsaved changes' : 'All changes saved'; s.classList.toggle('dirty', v); }
     };
@@ -87,9 +92,9 @@
         return '<tr data-i="' + i + '">' +
           '<td><input data-k="description" value="' + esc(it.description) + '" placeholder="Item or service"' + dis + '>' +
           '<textarea data-k="details" rows="1" placeholder="Details (optional)"' + dis + '>' + esc(it.details || '') + '</textarea></td>' +
-          '<td style="width:72px"><input data-k="quantity" type="number" step="0.01" value="' + esc(it.quantity) + '"' + dis + '></td>' +
+          '<td style="width:72px"><input data-k="quantity" type="number" step="0.01" placeholder="Qty" aria-label="Quantity" value="' + esc(it.quantity) + '"' + dis + '></td>' +
           '<td style="width:110px"><input data-k="unit" value="' + esc(it.unit || '') + '" placeholder="unit"' + dis + '></td>' +
-          '<td style="width:112px"><input data-k="unit_price" type="number" step="0.01" value="' + esc(it.unit_price) + '"' + dis + '></td>' +
+          '<td style="width:112px"><input data-k="unit_price" type="number" step="0.01" placeholder="Price" aria-label="Price" value="' + esc(it.unit_price) + '"' + dis + '></td>' +
           '<td class="amt">' + money(r2((Number(it.quantity) || 0) * (Number(it.unit_price) || 0)), currency()) + '</td>' +
           '<td class="del">' + (locked ? '' : '<button type="button" class="icon-btn" data-del="' + i + '" title="Remove">✕</button>') + '</td></tr>';
       }).join('');
@@ -118,18 +123,19 @@
       if (!tr) return;
       var it = items[+tr.getAttribute('data-i')];
       var k = e.target.getAttribute('data-k');
-      it[k] = (k === 'quantity' || k === 'unit_price') ? e.target.value : e.target.value;
+      it[k] = e.target.value;
+      changed.items = true;
       setDirty(true);
       recalc();
     });
     tbody.addEventListener('click', function (e) {
       var d = e.target.getAttribute('data-del');
-      if (d !== null) { items.splice(+d, 1); setDirty(true); renderItems(); }
+      if (d !== null) { items.splice(+d, 1); changed.items = true; setDirty(true); renderItems(); }
     });
     var add = $('#add-item');
     if (add) add.addEventListener('click', function () {
       items.push({ description: '', quantity: 1, unit: '', unit_price: 0 });
-      renderItems(); setDirty(true);
+      changed.items = true; renderItems(); setDirty(true);
       var inputs = $$('input[data-k="description"]', tbody); inputs[inputs.length - 1].focus();
     });
     var pick = $('#rate-pick');
@@ -138,17 +144,17 @@
       if (r) {
         items = items.filter(function (it) { return it.description; });
         items.push({ description: r.name, details: r.notes || '', quantity: 1, unit: r.unit || '', unit_price: r.unit_price });
-        renderItems(); setDirty(true);
+        changed.items = true; renderItems(); setDirty(true);
       }
       pick.value = '';
     });
     form.addEventListener('input', function (e) {
-      if (!e.target.closest('#items')) { setDirty(true); recalc(); }
+      if (!e.target.closest('#items') && e.target.name) { changed[e.target.name] = true; setDirty(true); recalc(); }
     });
 
     function payload() {
       var f = form.elements;
-      return {
+      var all = {
         title: f.title.value, client_name: f.client_name.value, client_company: f.client_company.value,
         client_email: f.client_email.value, intro: f.intro.value, currency: f.currency.value,
         discount: f.discount.value, tax_rate: f.tax_rate.value, valid_until: f.valid_until.value || undefined, terms: f.terms.value,
@@ -156,6 +162,10 @@
           return { description: it.description, details: it.details, quantity: Number(it.quantity) || 0, unit: it.unit, unit_price: Number(it.unit_price) || 0 };
         }),
       };
+      if (!QL.id) return all; // new quote: send everything
+      var out = {};
+      Object.keys(changed).forEach(function (k) { if (k in all) out[k] = all[k]; });
+      return out;
     }
     function save() {
       var btn = $('#save-btn');
@@ -165,6 +175,8 @@
         if (!QL.id) { dirty = false; location.href = '/app/quotes/' + d.quote.id; return d; }
         QL.updated = d.quote.updated_at;
         setDirty(false);
+        // If someone else changed the quote meanwhile, show the merged result.
+        if (!$('#ext-banner').classList.contains('hidden')) { location.reload(); return d; }
         toast('Saved');
         return d;
       }).catch(function (err) { toast(err.message); throw err; })
@@ -191,11 +203,12 @@
     if (QL.id) setInterval(function () {
       if (document.hidden) return;
       api('GET', '/app/api/quotes/' + QL.id + '/rev').then(function (d) {
+        if (d.loggedOut) { location.href = '/login'; return; }
         if (d.updated_at && d.updated_at !== QL.updated) {
           if (!dirty) location.reload();
           else $('#ext-banner').classList.remove('hidden');
         }
-      }).catch(function () {});
+      }).catch(loggedOut);
     }, 3000);
 
     renderItems();
