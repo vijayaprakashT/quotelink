@@ -127,9 +127,10 @@ route('GET', /^\/app\/?$/, (req, res, { user, url }) => {
     filter,
     mcpUrl: mcpUrlFor(req, user),
     rev: revFor(user.id),
+    usage: store.usage(user),
   }));
 }, { auth: true });
-route('GET', /^\/app\/quotes\/new$/, (req, res, { user }) => html(res, views.editor(user, { quote: null, base: baseUrl(req), rateCard: store.getRateCard(user.id) })), { auth: true });
+route('GET', /^\/app\/quotes\/new$/, (req, res, { user }) => store.usage(user).atLimit ? redirect(res, '/app/plan') : html(res, views.editor(user, { quote: null, base: baseUrl(req), rateCard: store.getRateCard(user.id) })), { auth: true });
 route('GET', /^\/app\/quotes\/([\w-]+)$/, (req, res, { user, m }) => {
   const quote = store.getQuote(user.id, m[1]);
   if (!quote) return html(res, views.notFound('Quote not found'), 404);
@@ -140,6 +141,11 @@ route('POST', /^\/app\/quotes\/([\w-]+)\/duplicate$/, (req, res, { user, m }) =>
   redirect(res, `/app/quotes/${copy.id}`);
 }, { auth: true });
 route('GET', /^\/app\/settings$/, (req, res, { user, url }) => html(res, views.settings(user, { rateCard: store.getRateCard(user.id), saved: url.searchParams.has('saved') })), { auth: true });
+route('GET', /^\/app\/plan$/, (req, res, { user, url }) => html(res, views.planPage(user, { usage: store.usage(user), flash: url.searchParams.has('upgraded') ? 'You are now on Pro — unlimited quotes. Thanks for being an early user!' : null })), { auth: true });
+route('POST', /^\/app\/plan\/upgrade$/, (req, res, { user }) => {
+  store.setPlan(user.id, 'pro');
+  redirect(res, '/app/plan?upgraded=1');
+}, { auth: true });
 route('GET', /^\/app\/connect$/, (req, res, { user }) => html(res, views.connect(user, { mcpUrl: mcpUrlFor(req, user) })), { auth: true });
 route('POST', /^\/app\/connect\/rotate$/, (req, res, { user }) => {
   if (user.email === DEMO_EMAIL) return redirect(res, '/app/connect'); // keep the shared demo URL stable
@@ -177,9 +183,6 @@ route('GET', /^\/q\/([\w-]+)$/, (req, res, { m, url }) => {
 });
 route('POST', /^\/q\/([\w-]+)\/respond$/, async (req, res, { m }) => {
   const body = await parseBody(req);
-  const viewer = currentUser(req);
-  const quote = store.getQuoteBySlug(m[1]);
-  if (quote && viewer && viewer.id === quote.user_id) throw new store.AppError('You are viewing your own quote. Open the link in a private window to respond as the client.', 403);
   store.respond(m[1], body);
   json(res, { ok: true });
 }, { api: true });

@@ -1,6 +1,6 @@
 'use strict';
 // Server-rendered HTML views.
-const { esc, money, fmtDate, fmtDateTime, richText } = require('./lib');
+const { esc, money, fmtDate, fmtDateTime, richText, shareMessage, whatsappLink } = require('./lib');
 const { STATUS_LABEL } = require('./store');
 
 const pill = (status) => `<span class="pill ${esc(status)}">${esc(STATUS_LABEL[status] || status)}</span>`;
@@ -14,7 +14,7 @@ function shell({ title, body, head = '', bodyClass = '' }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234b3fe0'/><text x='16' y='22' font-family='Arial' font-weight='800' font-size='17' fill='white' text-anchor='middle'>Q</text></svg>">
-<link rel="stylesheet" href="/static/style.css?v=5">
+<link rel="stylesheet" href="/static/style.css?v=8">
 ${head}
 </head>
 <body class="${esc(bodyClass)}">
@@ -23,6 +23,8 @@ ${body}
 </body>
 </html>`;
 }
+
+const WA_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.6.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.7.5-.1 1.5-.6 1.7-1.2s.2-1.1.2-1.2-.2-.2-.5-.3z"/></svg>';
 
 const logo = (href = '/') => `<a class="logo" href="${href}"><span class="logo-mark">Q</span>QuoteLink</a>`;
 
@@ -34,7 +36,7 @@ function appLayout(user, active, title, content, extraHead = '') {
     body: `
 <header class="topbar"><div class="wrap">
   ${logo('/app')}
-  <nav class="nav">${link('/app', 'quotes', 'Quotes')}${link('/app/settings', 'settings', 'Business & rates')}${link('/app/connect', 'connect', 'Connect Claude')}</nav>
+  <nav class="nav">${link('/app', 'quotes', 'Quotes')}${link('/app/settings', 'settings', 'Business & rates')}${link('/app/connect', 'connect', 'Connect Claude')}${link('/app/plan', 'plan', 'Plan')}</nav>
   <div class="spacer"></div>
   <span class="who hide-sm">${esc(user.business_name)}</span>
   <form method="post" action="/logout" style="margin:0"><button class="btn ghost" type="submit">Log out</button></form>
@@ -77,7 +79,7 @@ ${loggedIn ? '<a class="btn primary" href="/app">Open app</a>' : '<a class="btn 
   <p class="muted" style="text-align:center">You already pay for Claude. We don't charge you for AI — just for the workspace.</p>
   <section class="pricing">
     <div class="card price"><h3>Free</h3><div class="amt">$0</div><p class="muted small">forever</p>
-      <ul><li>5 quotes a month</li><li>Client e-sign links</li><li>Claude MCP connection</li></ul></div>
+      <ul><li>5 quotes a month</li><li>Client e-sign links</li><li>Claude MCP connection</li><li>WhatsApp & email sharing</li></ul></div>
     <div class="card price featured"><h3>Pro</h3><div class="amt">$12<span class="small muted">/mo</span></div><p class="muted small">for freelancers & studios</p>
       <ul><li>Unlimited quotes</li><li>View & response tracking</li><li>Your rate card & default terms</li><li>PDF download</li></ul></div>
     <div class="card price"><h3>Team <span class="pill">soon</span></h3><div class="amt">$29<span class="small muted">/mo</span></div><p class="muted small">up to 5 seats</p>
@@ -117,7 +119,7 @@ function authPage(kind, { error, values = {} } = {}) {
 }
 
 // ---------- dashboard ----------
-function dashboard(user, { quotes, stats, filter, mcpUrl, rev }) {
+function dashboard(user, { quotes, stats, filter, mcpUrl, rev, usage }) {
   const tabs = [
     ['', 'All'], ['draft', 'Drafts'], ['sent', 'Sent'], ['viewed', 'Viewed'],
     ['changes_requested', 'Changes requested'], ['accepted', 'Accepted'], ['declined', 'Declined'],
@@ -136,7 +138,7 @@ function dashboard(user, { quotes, stats, filter, mcpUrl, rev }) {
 <div class="page-head">
   <div><h1>Quotes</h1><div class="muted small"><span class="live-dot"></span>Live — new quotes from Claude appear here automatically</div></div>
   <div class="spacer"></div>
-  <a class="btn primary" href="/app/quotes/new">+ New quote</a>
+  ${usage.atLimit ? '<a class="btn primary" href="/app/plan">Upgrade for more quotes</a>' : '<a class="btn primary" href="/app/quotes/new">+ New quote</a>'}
 </div>
 ${stats.count === 0 ? `
 <div class="card connect-strip">
@@ -144,6 +146,7 @@ ${stats.count === 0 ? `
   <div style="flex:1"><strong>Connect your Claude to start.</strong><div class="small muted">Add this URL as a custom connector in Claude, then ask it to write a quote.</div></div>
   <div class="copybox" style="width:420px;max-width:100%"><input readonly value="${esc(mcpUrl)}" id="mcp-url"><button class="btn" data-copy="#mcp-url">Copy</button></div>
 </div>` : ''}
+${planStrip(usage)}
 <div class="kpis">
   <div class="card kpi"><div class="k-label">Open pipeline</div><div class="k-value">${money(stats.openValue, user.currency)}</div><div class="k-sub">${stats.openCount} quote${stats.openCount === 1 ? '' : 's'} with clients</div></div>
   <div class="card kpi"><div class="k-label">Won</div><div class="k-value">${money(stats.wonValue, user.currency)}</div><div class="k-sub">${stats.wonCount} accepted</div></div>
@@ -158,8 +161,42 @@ ${stats.count === 0 ? `
     : `<div class="empty"><div class="big">📝</div><h3>No quotes ${filter ? 'with this status' : 'yet'}</h3><p class="muted">Ask Claude: <em>“Create a QuoteLink quote for Priya at Lumen Foods for a logo and brand guide.”</em><br>or <a href="/app/quotes/new">write one by hand</a>.</p></div>`}
 </div>
 <script>window.QL = { rev: ${JSON.stringify(rev)} };</script>
-<script src="/static/app.js?v=5"></script>`;
+<script src="/static/app.js?v=8"></script>`;
   return appLayout(user, 'quotes', 'Quotes', content);
+}
+
+function planStrip(u) {
+  if (u.limit === null) {
+    return `<div class="plan-strip pro"><span class="plan-badge">PRO</span><span><strong>Pro plan</strong> · unlimited quotes · ${u.used} created this month</span><div class="spacer"></div><a href="/app/plan" class="small">Manage plan</a></div>`;
+  }
+  const pct = Math.min(100, Math.round((u.used / u.limit) * 100));
+  return `<div class="plan-strip ${u.atLimit ? 'full' : ''}">
+    <span class="plan-badge free">FREE</span>
+    <div style="flex:1;min-width:180px">
+      <div><strong>${u.atLimit ? 'Free limit reached' : `${u.used} of ${u.limit} free quotes used`}</strong> <span class="muted">this month${u.atLimit ? ' — new quotes are paused until next month' : ''}</span></div>
+      <div class="meter"><span style="width:${pct}%"></span></div>
+    </div>
+    <a class="btn ${u.atLimit ? 'primary' : ''}" href="/app/plan">Upgrade to Pro — unlimited</a>
+  </div>`;
+}
+
+// ---------- plan ----------
+function planPage(user, { usage, flash }) {
+  const isPro = usage.limit === null;
+  const content = `
+<div class="page-head"><div><h1>Your plan</h1><div class="muted small">You already pay for Claude, so QuoteLink never charges you for AI — only for the workspace.</div></div></div>
+${flash ? `<div class="ok-box">${esc(flash)}</div>` : ''}
+${planStrip(usage)}
+<section class="pricing" style="margin-top:6px">
+  <div class="card price ${!isPro ? 'featured' : ''}"><h3>Free ${!isPro ? '<span class="pill accepted">Current</span>' : ''}</h3><div class="amt">$0</div><p class="muted small">forever</p>
+    <ul><li>5 quotes a month</li><li>Client e-sign links</li><li>Claude MCP connection</li><li>WhatsApp & email sharing</li></ul></div>
+  <div class="card price ${isPro ? 'featured' : ''}"><h3>Pro ${isPro ? '<span class="pill accepted">Current</span>' : ''}</h3><div class="amt">$12<span class="small muted">/mo</span></div><p class="muted small">for freelancers & studios</p>
+    <ul><li>Unlimited quotes</li><li>View & response tracking</li><li>Rate card & default terms</li><li>PDF download</li></ul>
+    ${isPro ? '' : `<form method="post" action="/app/plan/upgrade"><button class="btn primary block" type="submit">Upgrade to Pro</button></form><p class="small muted" style="margin:8px 0 0">Online payments (Razorpay / Stripe) are coming soon — during early access, Pro is free.</p>`}</div>
+  <div class="card price"><h3>Team <span class="pill">soon</span></h3><div class="amt">$29<span class="small muted">/mo</span></div><p class="muted small">up to 5 seats</p>
+    <ul><li>Shared rate cards</li><li>Approval before sending</li><li>Win-rate reports</li></ul></div>
+</section>`;
+  return appLayout(user, 'plan', 'Plan', content);
 }
 
 // ---------- editor ----------
@@ -238,7 +275,11 @@ ${locked ? `<div class="banner warn">Accepted by ${esc(q.signed_name)} on ${fmtD
     <div class="card card-pad">
       <div class="section-title">Client link</div>
       <div class="copybox"><input readonly value="${esc(clientUrl)}" id="client-url"><button type="button" class="btn" data-copy="#client-url">Copy</button></div>
-      ${q.client_email ? `<a class="small" style="display:inline-block;margin-top:8px" href="mailto:${esc(q.client_email)}?subject=${encodeURIComponent('Quote ' + q.number + ': ' + q.title)}&body=${encodeURIComponent(`Hi ${q.client_name || ''},\n\nHere is your quote from ${user.business_name}:\n${clientUrl}\n\nYou can review it and accept online.\n\nThanks!`)}">Email it from your mail app →</a>` : ''}
+      <div class="grid" style="gap:8px;margin-top:10px">
+        <a class="btn wa block" href="${esc(whatsappLink(shareMessage(q, user.business_name, clientUrl)))}" target="_blank" rel="noopener">${WA_ICON} Share on WhatsApp</a>
+        ${q.client_email ? `<a class="btn block" href="mailto:${esc(q.client_email)}?subject=${encodeURIComponent('Quote ' + q.number + ': ' + q.title)}&body=${encodeURIComponent(shareMessage(q, user.business_name, clientUrl))}">✉ Email to ${esc(q.client_email)}</a>` : ''}
+      </div>
+      ${['changes_requested', 'declined'].includes(q.status) ? '<p class="small muted" style="margin:8px 0 0">After revising, click <strong>Send revised quote</strong>, then share the link again — the same link always shows the latest version.</p>' : ''}
     </div>` : ''}
     ${quote && q.client_message ? `<div class="feedback ${q.status === 'accepted' ? 'accepted' : ''}"><div class="section-title" style="color:inherit">${q.status === 'changes_requested' ? 'Client asked for changes' : q.status === 'declined' ? 'Client declined' : 'Client note'}</div>${esc(q.client_message)}<div class="small" style="margin-top:8px;opacity:.8">Tip: ask Claude “Revise ${esc(q.number)} based on the client’s feedback.”</div></div>` : ''}
     ${quote ? `
@@ -257,7 +298,7 @@ ${locked ? `<div class="banner warn">Accepted by ${esc(q.signed_name)} on ${fmtD
     locked,
     rateCard,
   }).replace(/</g, '\\u003c')};</script>
-<script src="/static/app.js?v=5"></script>`;
+<script src="/static/app.js?v=8"></script>`;
   return appLayout(user, 'quotes', isNew ? 'New quote' : `${q.number} ${q.title}`, content);
 }
 
@@ -301,7 +342,7 @@ ${saved ? '<div class="ok-box">Saved.</div>' : ''}
   <aside class="side"><div class="card card-pad"><button class="btn primary block" type="submit">Save</button><p class="small muted" style="margin:10px 0 0">Tip: you can also tell Claude “Update my QuoteLink rate card: logo design $1,200…”.</p></div></aside>
 </form>
 <script>window.QL = ${JSON.stringify({ settings: true, rateCard }).replace(/</g, '\\u003c')};</script>
-<script src="/static/app.js?v=5"></script>`;
+<script src="/static/app.js?v=8"></script>`;
   return appLayout(user, 'settings', 'Business & rates', content);
 }
 
@@ -346,7 +387,7 @@ function connect(user, { mcpUrl }) {
     </div>
   </aside>
 </div>
-<script src="/static/app.js?v=5"></script>`;
+<script src="/static/app.js?v=8"></script>`;
   return appLayout(user, 'connect', 'Connect Claude', content);
 }
 
@@ -380,24 +421,24 @@ function publicQuote({ quote, owner, isOwnerPreview, justResponded }) {
     <input name="name" required placeholder="${esc(quote.client_name || 'Your full name')}" autocomplete="name">
     <div class="sig-preview" id="sig"></div>
     <label style="display:flex;gap:8px;font-weight:500;align-items:flex-start"><input type="checkbox" required style="width:auto;margin-top:3px"> I accept this quote of <strong>&nbsp;${money(t.total, cur)}&nbsp;</strong> and the terms above.</label>
-    <button class="btn green lg" type="submit" style="margin-top:12px" ${isOwnerPreview ? 'disabled title="Preview only"' : ''}>Accept quote</button>
+    <button class="btn green lg" type="submit" style="margin-top:12px">Accept quote</button>
   </form>
   <form data-action="changes" class="resp-form hidden">
     <label>What would you like changed?</label>
     <textarea name="message" rows="4" required placeholder="e.g. Can we drop the brand guide and add a second logo concept?"></textarea>
-    <button class="btn primary" type="submit" style="margin-top:10px" ${isOwnerPreview ? 'disabled' : ''}>Send request</button>
+    <button class="btn primary" type="submit" style="margin-top:10px">Send request</button>
   </form>
   <form data-action="decline" class="resp-form hidden">
     <label>Reason (optional)</label>
     <textarea name="message" rows="3" placeholder="Anything we should know?"></textarea>
-    <button class="btn danger" type="submit" style="margin-top:10px" ${isOwnerPreview ? 'disabled' : ''}>Decline quote</button>
+    <button class="btn danger" type="submit" style="margin-top:10px">Decline quote</button>
   </form>
 </div>`;
   }
   return shell({
     title: `${quote.number} · ${quote.title} — ${owner.business_name}`,
     body: `
-${isOwnerPreview ? `<div class="preview-bar">${quote.status === 'draft' ? 'Draft preview — only you can see this until you send it.' : 'You are viewing your own client link (views by you are not tracked).'} <a href="/app/quotes/${esc(quote.id)}">Back to editor</a></div>` : ''}
+${isOwnerPreview ? `<div class="preview-bar">${quote.status === 'draft' ? 'Draft preview — only you can see this. Send it to activate the client buttons.' : 'You are logged in as the owner. You can test the buttons — your response is recorded as the client’s.'} <a href="/app/quotes/${esc(quote.id)}">Back to editor</a></div>` : ''}
 <div class="doc">
   ${justResponded ? `<div class="ok-box no-print">Thank you — your response has been sent to ${esc(owner.business_name)}.</div>` : ''}
   <div class="paper">
@@ -426,7 +467,7 @@ ${isOwnerPreview ? `<div class="preview-bar">${quote.status === 'draft' ? 'Draft
   <div class="row no-print" style="justify-content:center;margin-top:16px"><button class="btn ghost small" onclick="window.print()">Download / print PDF</button></div>
   <div class="powered no-print">Sent with <a href="/">QuoteLink</a></div>
 </div>
-${!answered ? `<script>window.QL = { slug: ${JSON.stringify(quote.slug)}, publicView: true };</script><script src="/static/app.js?v=5"></script>` : ''}`,
+${!answered ? `<script>window.QL = { slug: ${JSON.stringify(quote.slug)}, publicView: true };</script><script src="/static/app.js?v=8"></script>` : ''}`,
   });
 }
 
@@ -437,4 +478,4 @@ function notFound(msg = 'Page not found') {
   });
 }
 
-module.exports = { landing, authPage, dashboard, editor, settings, connect, publicQuote, notFound };
+module.exports = { landing, authPage, dashboard, editor, settings, connect, publicQuote, notFound, planPage };

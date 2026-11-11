@@ -2,7 +2,7 @@
 // Model Context Protocol server (Streamable HTTP transport, stateless, JSON responses).
 // Claude does the thinking and writing; these tools only store, edit and serve the result.
 const store = require('./store');
-const { money, fmtDate } = require('./lib');
+const { money, fmtDate, shareMessage, whatsappLink } = require('./lib');
 
 const SUPPORTED_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 const SERVER_INFO = { name: 'quotelink', title: 'QuoteLink', version: '1.0.0' };
@@ -90,7 +90,7 @@ const TOOLS = [
   {
     name: 'send_quote',
     title: 'Send quote to client',
-    description: 'Marks the quote as sent and activates its client link so the client can view, accept (e-sign), request changes or decline. Returns the link to share. Only call when the user asks to send.',
+    description: 'Marks the quote as sent (or re-sent after a revision) and activates its client link so the client can view, accept (e-sign), request changes or decline. Returns the link plus a one-click WhatsApp share link with a ready message — show both to the user. Only call when the user asks to send.',
     inputSchema: { type: 'object', properties: { quote: quoteRef }, required: ['quote'] },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   },
@@ -195,7 +195,11 @@ function callTool(user, base, name, args = {}) {
   try {
     switch (name) {
       case 'get_business_profile': {
+        const u = store.usage(user);
         const profile = {
+          plan: u.planName,
+          quotes_this_month: u.used,
+          quotes_left_this_month: u.remaining === null ? 'unlimited' : u.remaining,
           business_name: user.business_name,
           contact_name: user.name,
           business_email: user.business_email,
@@ -210,7 +214,7 @@ function callTool(user, base, name, args = {}) {
           ? profile.rate_card.map((r) => `- ${r.name}: ${money(r.unit_price, user.currency)}${r.unit ? ' / ' + r.unit : ''}${r.notes ? ' (' + r.notes + ')' : ''}`).join('\n')
           : '- (no rate card yet — ask the user for prices or use sensible market rates and say so)';
         return ok(
-          `Business: ${profile.business_name}\nCurrency: ${profile.currency} · Default tax: ${profile.tax_rate}%\nDefault terms: ${profile.default_terms || '—'}\nRate card:\n${rc}`,
+          `Business: ${profile.business_name}\nPlan: ${u.planName} — ${u.limit === null ? 'unlimited quotes' : `${u.used} of ${u.limit} free quotes used this month`}\nCurrency: ${profile.currency} · Default tax: ${profile.tax_rate}%\nDefault terms: ${profile.default_terms || '—'}\nRate card:\n${rc}`,
           profile,
         );
       }
@@ -218,8 +222,10 @@ function callTool(user, base, name, args = {}) {
         if (!Array.isArray(args.items) || !args.items.length) return fail('Please include at least one line item.');
         const quote = store.createQuote(user, args, 'claude');
         const l = links(base, quote);
+        const u = store.usage(store.getUser(user.id));
+        const planNote = u.limit === null ? '' : `\nFree plan: ${u.used} of ${u.limit} quotes used this month.`;
         return ok(
-          quoteText(quote, l, 'Saved draft quote') + '\n\nThe user can now open the app link to review and edit it. Ask before sending it to the client.',
+          quoteText(quote, l, 'Saved draft quote') + planNote + '\n\nThe user can now open the app link to review and edit it. Ask before sending it to the client.',
           quoteDetail(base, quote, []),
         );
       }
@@ -255,9 +261,13 @@ function callTool(user, base, name, args = {}) {
       case 'send_quote': {
         const quote = store.sendQuote(user, args.quote, 'Claude');
         const l = links(base, quote);
+        const message = shareMessage(quote, user.business_name, l.client_url);
+        const wa = whatsappLink(message);
         return ok(
-          `${quote.number} is live. Share this link with ${quote.client_name || 'the client'}${quote.client_email ? ' (' + quote.client_email + ')' : ''}:\n${l.client_url}\n\nThey can review it, e-sign to accept, request changes or decline. QuoteLink tracks views and responses.`,
-          quoteSummary(base, quote),
+          `${quote.number} is live. Share this link with ${quote.client_name || 'the client'}${quote.client_email ? ' (' + quote.client_email + ')' : ''}:\n${l.client_url}\n\n` +
+            `One-click WhatsApp share (opens WhatsApp with the message ready): ${wa}\n\n` +
+            `They can review it, e-sign to accept, request changes or decline. QuoteLink tracks views and responses.`,
+          { ...quoteSummary(base, quote), share_message: message, whatsapp_url: wa },
         );
       }
       case 'update_business_profile': {

@@ -110,7 +110,17 @@ function parseCookies(header) {
   return out;
 }
 
+// Ready-to-send message for the client (WhatsApp / email).
+function shareMessage(quote, businessName, url) {
+  const name = quote.client_name ? quote.client_name.split(' ')[0] : 'there';
+  const revised = quote.version > 1 || quote.status === 'changes_requested';
+  return `Hi ${name}, ${revised ? 'here is the updated quote' : 'here is your quote'} from ${businessName} for "${quote.title}" (${money(quote.totals.total, quote.currency)}).` +
+    `\n\nYou can review it and accept online here:\n${url}\n\nThanks!`;
+}
+const whatsappLink = (text) => `https://wa.me/?text=${encodeURIComponent(text)}`;
+
 module.exports = {
+  shareMessage, whatsappLink,
   esc, randomId, now, addDays, round2, money, fmtDate, fmtDateTime, richText,
   hashPassword, verifyPassword, signSession, readSession, parseCookies,
 };

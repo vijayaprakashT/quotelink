@@ -7,7 +7,11 @@ const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'demo1234';
 const DEMO_MCP_KEY = process.env.DEMO_MCP_KEY || 'ql_demo_7Hk2pXq9Lm4Vt8Rw';
 
 function seedDemo() {
-  if (store.getUserByEmail(DEMO_EMAIL)) return;
+  const existing = store.getUserByEmail(DEMO_EMAIL);
+  if (existing) {
+    if (existing.plan !== 'pro') store.setPlan(existing.id, 'pro'); // reviewers should never hit the free limit
+    return;
+  }
   let user = store.createUser({
     email: DEMO_EMAIL,
     password: DEMO_PASSWORD,
@@ -15,7 +19,7 @@ function seedDemo() {
     business_name: 'Pixel & Pine Studio',
     currency: 'USD',
   });
-  store.db.prepare('UPDATE users SET mcp_key = ? WHERE id = ?').run(DEMO_MCP_KEY, user.id);
+  store.db.prepare('UPDATE users SET mcp_key = ?, plan = ? WHERE id = ?').run(DEMO_MCP_KEY, 'pro', user.id);
   user = store.updateProfile(user.id, {
     business_email: 'hello@pixelandpine.studio',
     business_address: 'Bengaluru, India',

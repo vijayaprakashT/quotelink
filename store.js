@@ -75,7 +75,31 @@ CREATE INDEX IF NOT EXISTS events_quote ON events(quote_id, id);
 CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
 `);
 
+// Lightweight migrations for databases created by earlier versions.
+const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+if (!userCols.includes('plan')) db.exec("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'");
+
 const q = (sql) => db.prepare(sql);
+
+// ---------- plans ----------
+const PLANS = {
+  free: { name: 'Free', monthlyQuotes: 5, price: 0 },
+  pro: { name: 'Pro', monthlyQuotes: null, price: 12 },
+};
+const monthStart = () => {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
+};
+function usage(user) {
+  const plan = PLANS[user.plan] || PLANS.free;
+  const used = q('SELECT COUNT(*) AS n FROM quotes WHERE user_id = ? AND created_at >= ?').get(user.id, monthStart()).n;
+  const limit = plan.monthlyQuotes;
+  return { plan: user.plan in PLANS ? user.plan : 'free', planName: plan.name, used, limit, remaining: limit === null ? null : Math.max(0, limit - used), atLimit: limit !== null && used >= limit };
+}
+function setPlan(userId, plan) {
+  if (!PLANS[plan]) throw new AppError('Unknown plan.');
+  q('UPDATE users SET plan = ? WHERE id = ?').run(plan, userId);
+}
 
 // ---------- key/value ----------
 function kvGet(k) {
@@ -244,6 +268,10 @@ function createQuote(user, data, source = 'web') {
   const items = normalizeItems(data.items);
   const title = cleanStr(data.title, 200);
   if (!title) throw new AppError('A quote needs a title.');
+  const u = usage(user);
+  if (u.atLimit) {
+    throw new AppError(`You've used all ${u.limit} free quotes for this month. Upgrade to QuoteLink Pro for unlimited quotes, or edit an existing quote.`, 402);
+  }
   const seq = (user.quote_seq || 0) + 1;
   q('UPDATE users SET quote_seq = ? WHERE id = ?').run(seq, user.id);
   user.quote_seq = seq;
@@ -426,7 +454,7 @@ function stats(userId) {
 const lastChange = (userId) => q('SELECT MAX(updated_at) AS t, COUNT(*) AS n FROM quotes WHERE user_id = ?').get(userId);
 
 module.exports = {
-  db, AppError, STATUSES, STATUS_LABEL, kvGet, kvSet,
+  db, AppError, STATUSES, STATUS_LABEL, kvGet, kvSet, PLANS, usage, setPlan,
   createUser, getUser, getUserByEmail, getUserByKey, updateProfile, rotateKey,
   getRateCard, setRateCard,
   createQuote, getQuote, getQuoteBySlug, listQuotes, updateQuote, sendQuote, deleteQuote, duplicateQuote,
