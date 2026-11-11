@@ -162,7 +162,7 @@
       if (btn) btn.disabled = true;
       var req = QL.id ? api('PUT', '/app/api/quotes/' + QL.id, payload()) : api('POST', '/app/api/quotes', payload());
       return req.then(function (d) {
-        if (!QL.id) { location.href = '/app/quotes/' + d.quote.id; return d; }
+        if (!QL.id) { dirty = false; location.href = '/app/quotes/' + d.quote.id; return d; }
         QL.updated = d.quote.updated_at;
         setDirty(false);
         toast('Saved');
@@ -178,7 +178,7 @@
     if (send) send.addEventListener('click', function () {
       (dirty ? save() : Promise.resolve()).then(function () {
         return api('POST', '/app/api/quotes/' + QL.id + '/send');
-      }).then(function () { location.reload(); }).catch(function (err) { toast(err.message); });
+      }).then(function () { dirty = false; location.reload(); }).catch(function (err) { toast(err.message); });
     });
     var del = $('#delete-btn');
     if (del) del.addEventListener('click', function () {
