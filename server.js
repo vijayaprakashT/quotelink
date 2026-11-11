@@ -38,15 +38,16 @@ const redirect = (res, to, headers = {}) => send(res, 303, '', { Location: to, .
 function readBody(req, limit = 1_000_000) {
   return new Promise((resolve, reject) => {
     let size = 0;
+    let tooBig = false;
     const chunks = [];
     req.on('data', (c) => {
       size += c.length;
       if (size > limit) {
-        reject(new store.AppError('Request too large', 413));
-        req.destroy();
+        if (!tooBig) reject(new store.AppError('Request too large', 413));
+        tooBig = true; // keep draining so we can still send a clean 413 response
       } else chunks.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('end', () => { if (!tooBig) resolve(Buffer.concat(chunks).toString('utf8')); });
     req.on('error', reject);
   });
 }
@@ -154,11 +155,17 @@ route('POST', /^\/app\/connect\/rotate$/, (req, res, { user }) => {
 }, { auth: true });
 
 // App JSON API
-route('GET', /^\/app\/api\/rev$/, (req, res, { user }) => json(res, { rev: revFor(user.id) }), { auth: true, api: true });
-route('GET', /^\/app\/api\/quotes\/([\w-]+)\/rev$/, (req, res, { user, m }) => {
+// Live-update polling: answers {loggedOut:true} (not 401) so a page left open after logout fails quietly.
+route('GET', /^\/app\/api\/rev$/, (req, res) => {
+  const user = currentUser(req);
+  json(res, user ? { rev: revFor(user.id) } : { loggedOut: true });
+});
+route('GET', /^\/app\/api\/quotes\/([\w-]+)\/rev$/, (req, res, { m }) => {
+  const user = currentUser(req);
+  if (!user) return json(res, { loggedOut: true });
   const quote = store.getQuote(user.id, m[1]);
   json(res, { updated_at: quote ? quote.updated_at : null });
-}, { auth: true, api: true });
+});
 route('POST', /^\/app\/api\/quotes$/, async (req, res, { user }) => json(res, { quote: store.createQuote(user, await parseBody(req), 'web') }, 201), { auth: true, api: true });
 route('PUT', /^\/app\/api\/quotes\/([\w-]+)$/, async (req, res, { user, m }) => json(res, { quote: store.updateQuote(user, m[1], await parseBody(req), 'You') }), { auth: true, api: true });
 route('POST', /^\/app\/api\/quotes\/([\w-]+)\/send$/, (req, res, { user, m }) => json(res, { quote: store.sendQuote(user, m[1], 'You') }), { auth: true, api: true });

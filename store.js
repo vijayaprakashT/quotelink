@@ -129,15 +129,10 @@ function cleanStr(v, max = 500) {
   const s = String(v).trim();
   return s ? s.slice(0, max) : null;
 }
+const CURRENCIES = new Set(Intl.supportedValuesOf('currency'));
 function cleanCurrency(v, fallback = 'USD') {
   const s = String(v || '').trim().toUpperCase();
-  if (!/^[A-Z]{3}$/.test(s)) return fallback;
-  try {
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: s });
-    return s;
-  } catch {
-    return fallback;
-  }
+  return CURRENCIES.has(s) ? s : fallback;
 }
 function cleanNum(v, { min = 0, max = 1e12, fallback = 0 } = {}) {
   const n = Number(v);

@@ -14,7 +14,7 @@ function shell({ title, body, head = '', bodyClass = '' }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234b3fe0'/><text x='16' y='22' font-family='Arial' font-weight='800' font-size='17' fill='white' text-anchor='middle'>Q</text></svg>">
-<link rel="stylesheet" href="/static/style.css?v=9">
+<link rel="stylesheet" href="/static/style.css?v=14">
 ${head}
 </head>
 <body class="${esc(bodyClass)}">
@@ -109,7 +109,7 @@ function authPage(kind, { error, values = {} } = {}) {
         <div class="field"><label>Currency</label><select name="currency">${['USD', 'INR', 'SGD', 'EUR', 'GBP', 'AUD', 'AED', 'CAD'].map((c) => `<option ${values.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
       </div>` : ''}
       <div class="field"><label>Email</label><input name="email" type="email" required value="${esc(values.email)}" autocomplete="email"></div>
-      <div class="field"><label>Password</label><input name="password" type="password" required minlength="6" autocomplete="${isSignup ? 'new-password' : 'current-password'}"></div>
+      <div class="field"><label>Password</label><input name="password" type="password" required ${isSignup ? 'minlength="6"' : ''} autocomplete="${isSignup ? 'new-password' : 'current-password'}"></div>
       <button class="btn primary block lg" type="submit">${isSignup ? 'Create account' : 'Log in'}</button>
     </form>
     <p class="small muted" style="margin-top:16px;text-align:center">${isSignup ? 'Already have an account? <a href="/login">Log in</a>' : 'New here? <a href="/signup">Create an account</a> · <a href="/demo">Open the demo</a>'}</p>
@@ -127,8 +127,8 @@ function dashboard(user, { quotes, stats, filter, mcpUrl, rev, usage }) {
   const rows = quotes
     .map(
       (q) => `<tr class="clickable" data-href="/app/quotes/${esc(q.id)}" data-updated="${esc(q.updated_at)}">
-      <td><div class="q-title">${esc(q.title)} ${claudeBadge(q)}</div><div class="q-sub">${esc(q.number)} · ${esc([q.client_name, q.client_company].filter(Boolean).join(', ') || 'No client yet')}</div></td>
-      <td>${pill(q.status)}${q.status === 'changes_requested' ? `<div class="q-sub" style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">“${esc(q.client_message)}”</div>` : ''}${q.signed_name ? `<div class="q-sub">Signed by ${esc(q.signed_name)}</div>` : ''}</td>
+      <td><div class="q-title">${esc(q.title)} ${claudeBadge(q)}</div><div class="q-sub">${esc(q.number)} · ${esc([q.client_name, q.client_company].filter(Boolean).join(', ') || 'No client yet')}</div><div class="show-sm" style="margin-top:6px">${pill(q.status)}</div></td>
+      <td class="hide-sm">${pill(q.status)}${q.status === 'changes_requested' ? `<div class="q-sub clip">“${esc(q.client_message)}”</div>` : ''}${q.signed_name ? `<div class="q-sub">Signed by ${esc(q.signed_name)}</div>` : ''}</td>
       <td class="hide-sm q-sub">${fmtDateTime(q.updated_at)}</td>
       <td class="num"><strong>${money(q.totals.total, q.currency)}</strong></td>
     </tr>`,
@@ -157,11 +157,11 @@ ${planStrip(usage)}
   <div class="row" style="padding:14px 16px;border-bottom:1px solid var(--line)">
     <div class="filters">${tabs.map(([k, l]) => `<a href="/app${k ? '?status=' + k : ''}" class="${(filter || '') === k ? 'active' : ''}">${l}</a>`).join('')}</div>
   </div>
-  ${quotes.length ? `<table class="list"><thead><tr><th>Quote</th><th>Status</th><th class="hide-sm">Last activity</th><th class="num">Total</th></tr></thead><tbody>${rows}</tbody></table>`
+  ${quotes.length ? `<div class="table-scroll"><table class="list"><thead><tr><th>Quote</th><th class="hide-sm">Status</th><th class="hide-sm">Last activity</th><th class="num">Total</th></tr></thead><tbody>${rows}</tbody></table></div>`
     : `<div class="empty"><div class="big">📝</div><h3>No quotes ${filter ? 'with this status' : 'yet'}</h3><p class="muted">Ask Claude: <em>“Create a QuoteLink quote for Priya at Lumen Foods for a logo and brand guide.”</em><br>or <a href="/app/quotes/new">write one by hand</a>.</p></div>`}
 </div>
 <script>window.QL = { rev: ${JSON.stringify(rev)} };</script>
-<script src="/static/app.js?v=9"></script>`;
+<script src="/static/app.js?v=14"></script>`;
   return appLayout(user, 'quotes', 'Quotes', content);
 }
 
@@ -298,7 +298,7 @@ ${locked ? `<div class="banner warn">Accepted by ${esc(q.signed_name)} on ${fmtD
     locked,
     rateCard,
   }).replace(/</g, '\\u003c')};</script>
-<script src="/static/app.js?v=9"></script>`;
+<script src="/static/app.js?v=14"></script>`;
   return appLayout(user, 'quotes', isNew ? 'New quote' : `${q.number} ${q.title}`, content);
 }
 
@@ -342,7 +342,7 @@ ${saved ? '<div class="ok-box">Saved.</div>' : ''}
   <aside class="side"><div class="card card-pad"><button class="btn primary block" type="submit">Save</button><p class="small muted" style="margin:10px 0 0">Tip: you can also tell Claude “Update my QuoteLink rate card: logo design $1,200…”.</p></div></aside>
 </form>
 <script>window.QL = ${JSON.stringify({ settings: true, rateCard }).replace(/</g, '\\u003c')};</script>
-<script src="/static/app.js?v=9"></script>`;
+<script src="/static/app.js?v=14"></script>`;
   return appLayout(user, 'settings', 'Business & rates', content);
 }
 
@@ -387,7 +387,7 @@ function connect(user, { mcpUrl }) {
     </div>
   </aside>
 </div>
-<script src="/static/app.js?v=9"></script>`;
+<script src="/static/app.js?v=14"></script>`;
   return appLayout(user, 'connect', 'Connect Claude', content);
 }
 
@@ -468,7 +468,7 @@ ${isOwnerPreview ? `<div class="preview-bar">${quote.status === 'draft' ? 'Draft
   <div class="row no-print" style="justify-content:center;margin-top:16px"><button class="btn ghost small" onclick="window.print()">Download / print PDF</button></div>
   <div class="powered no-print">Sent with <a href="/">QuoteLink</a></div>
 </div>
-${!answered ? `<script>window.QL = ${JSON.stringify({ slug: quote.slug, publicView: true, signer: quote.client_name || null }).replace(/</g, '\\u003c')};</script><script src="/static/app.js?v=9"></script>` : ''}`,
+${!answered ? `<script>window.QL = ${JSON.stringify({ slug: quote.slug, publicView: true, signer: quote.client_name || null }).replace(/</g, '\\u003c')};</script><script src="/static/app.js?v=14"></script>` : ''}`,
   });
 }
 
