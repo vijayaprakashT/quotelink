@@ -83,6 +83,10 @@ async function main() {
 
   const sent = await call('send_quote', { quote: q.number });
   assert.ok(sent.content[0].text.includes('/q/'));
+  assert.ok(sent.structuredContent.whatsapp_url.startsWith('https://wa.me/?text='));
+  const editorHtml = await (await fetch(`${BASE}/app/quotes/${q.id}`, { headers: { cookie } })).text();
+  assert.ok(editorHtml.includes('Share on WhatsApp'));
+  console.log('✓ WhatsApp share link (Claude + editor)');
   const pub = await fetch(q.client_url);
   assert.equal(pub.status, 200);
   const pubHtml = await pub.text();
@@ -110,7 +114,30 @@ async function main() {
     const r = await fetch(BASE + p, { headers: { cookie } });
     assert.equal(r.status, 200, p);
   }
-  console.log('✓ pages render\nALL GOOD');
+  console.log('✓ pages render');
+
+  // Free plan: 5 quotes a month, then Claude is told to upgrade. Demo account is Pro.
+  assert.ok(dash.includes('Pro plan'));
+  const signup = await fetch(`${BASE}/signup`, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'business_name=Test+Co&email=free%40example.com&password=secret12&currency=INR' });
+  const freeCookie = signup.headers.get('set-cookie').split(';')[0];
+  const connectHtml = await (await fetch(`${BASE}/app/connect`, { headers: { cookie: freeCookie } })).text();
+  const freeKey = connectHtml.match(/\/mcp\/(ql_[\w]+)/)[1];
+  const freeCall = async (name, args) => (await rpc('tools/call', { name, arguments: args }, freeKey)).body.result;
+  for (let i = 1; i <= 5; i++) {
+    const r = await freeCall('create_quote', { title: `Job ${i}`, client_name: 'A', items: [{ description: 'Work', unit_price: 100 }] });
+    assert.ok(!r.isError, r.content[0].text);
+  }
+  const sixth = await freeCall('create_quote', { title: 'Job 6', client_name: 'A', items: [{ description: 'Work', unit_price: 100 }] });
+  assert.ok(sixth.isError && sixth.content[0].text.includes('Upgrade'));
+  const freeDash = await (await fetch(`${BASE}/app`, { headers: { cookie: freeCookie } })).text();
+  assert.ok(freeDash.includes('Free limit reached'));
+  const prof = await freeCall('get_business_profile', {});
+  assert.ok(prof.content[0].text.includes('5 of 5 free quotes'));
+  const up = await fetch(`${BASE}/app/plan/upgrade`, { method: 'POST', redirect: 'manual', headers: { cookie: freeCookie } });
+  assert.equal(up.status, 303);
+  const seventh = await freeCall('create_quote', { title: 'Job 7', client_name: 'A', items: [{ description: 'Work', unit_price: 100 }] });
+  assert.ok(!seventh.isError);
+  console.log('✓ free plan limit (5/month), upgrade to Pro, demo is Pro\nALL GOOD');
 }
 
 main()
