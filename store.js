@@ -395,6 +395,9 @@ function duplicateQuote(user, ref) {
   return createQuote(user, { ...src, title: src.title, valid_days: 30, valid_until: null }, 'web');
 }
 
+// Names match if they are equal ignoring case, punctuation and extra spaces.
+const normName = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
 // Client-side actions on the public link.
 function recordView(quote) {
   if (!['sent', 'viewed'].includes(quote.status)) return;
@@ -417,8 +420,13 @@ function respond(slug, { action, name, message }) {
   const msg = cleanStr(message, 2000);
   if (action === 'accept') {
     if (quote.expired) throw new AppError('This quote has expired. Please ask for an updated quote.', 409);
-    const signer = cleanStr(name, 120);
+    let signer = cleanStr(name, 120);
     if (!signer) throw new AppError('Please type your full name to accept.');
+    signer = signer.replace(/\s+/g, ' ');
+    if (quote.client_name && normName(signer) !== normName(quote.client_name)) {
+      throw new AppError(`The signature must match the name on this quote: ${quote.client_name}. If someone else should sign, ask the sender to update the client name.`);
+    }
+    if (quote.client_name) signer = quote.client_name;
     q(`UPDATE quotes SET status = 'accepted', signed_name = ?, client_message = ?, responded_at = ?, updated_at = ? WHERE id = ?`).run(signer, msg, ts, ts, quote.id);
     logEvent(quote.id, 'accepted', 'Client', `Signed by ${signer}`);
   } else if (action === 'changes') {
