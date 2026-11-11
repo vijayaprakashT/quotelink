@@ -141,7 +141,12 @@ table.list tr.flash td { animation: flash 2.4s ease-out; }
 /* editor */
 .editor { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
 .side { position: sticky; top: 80px; display: grid; gap: 16px; }
-.items-table { width: 100%; border-collapse: collapse; }
+.items-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.items-table .c-qty { width: 76px; }
+.items-table .c-unit { width: 104px; }
+.items-table .c-price { width: 112px; }
+.items-table .c-amt { width: 112px; }
+.items-table .c-del { width: 40px; }
 .items-table th { font-size: 12px; color: var(--muted); text-align: left; font-weight: 600; padding: 0 6px 6px; }
 .items-table td { padding: 5px 6px; vertical-align: top; }
 .items-table input, .items-table textarea { padding: 7px 9px; }
@@ -223,6 +228,10 @@ ol.howto { padding-left: 20px; }
 ol.howto li { margin-bottom: 10px; }
 .prompt-list li { margin-bottom: 8px; }
 
+@media (max-width: 1100px) {
+  .editor { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; }
+}
 @media (max-width: 920px) {
   .editor { grid-template-columns: minmax(0, 1fr); }
   .editor > *, .editor .grid > * { min-width: 0; }
