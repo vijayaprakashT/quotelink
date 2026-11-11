@@ -14,7 +14,7 @@ function shell({ title, body, head = '', bodyClass = '' }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234b3fe0'/><text x='16' y='22' font-family='Arial' font-weight='800' font-size='17' fill='white' text-anchor='middle'>Q</text></svg>">
-<link rel="stylesheet" href="/static/style.css?v=14">
+<link rel="stylesheet" href="/static/style.css?v=16">
 ${head}
 </head>
 <body class="${esc(bodyClass)}">
@@ -161,7 +161,7 @@ ${planStrip(usage)}
     : `<div class="empty"><div class="big">📝</div><h3>No quotes ${filter ? 'with this status' : 'yet'}</h3><p class="muted">Ask Claude: <em>“Create a QuoteLink quote for Priya at Lumen Foods for a logo and brand guide.”</em><br>or <a href="/app/quotes/new">write one by hand</a>.</p></div>`}
 </div>
 <script>window.QL = { rev: ${JSON.stringify(rev)} };</script>
-<script src="/static/app.js?v=14"></script>`;
+<script src="/static/app.js?v=16"></script>`;
   return appLayout(user, 'quotes', 'Quotes', content);
 }
 
@@ -239,7 +239,7 @@ ${locked ? `<div class="banner warn">Accepted by ${esc(q.signed_name)} on ${fmtD
         ${!locked && rateCard.length ? `<select id="rate-pick" style="width:auto"><option value="">+ Add from rate card…</option>${rateCard.map((r, i) => `<option value="${i}">${esc(r.name)} — ${money(r.unit_price, user.currency)}${r.unit ? '/' + esc(r.unit) : ''}</option>`).join('')}</select>` : ''}
       </div>
       <table class="items-table">
-        <thead><tr><th style="width:55%">Item</th><th>Qty</th><th>Unit</th><th>Price</th><th class="num">Amount</th><th></th></tr></thead>
+        <thead><tr><th>Item</th><th class="c-qty">Qty</th><th class="c-unit">Unit</th><th class="c-price">Price</th><th class="num c-amt">Amount</th><th class="c-del"></th></tr></thead>
         <tbody id="items"></tbody>
       </table>
       ${locked ? '' : '<button type="button" class="btn" id="add-item" style="margin-top:8px">+ Add line</button>'}
@@ -298,7 +298,7 @@ ${locked ? `<div class="banner warn">Accepted by ${esc(q.signed_name)} on ${fmtD
     locked,
     rateCard,
   }).replace(/</g, '\\u003c')};</script>
-<script src="/static/app.js?v=14"></script>`;
+<script src="/static/app.js?v=16"></script>`;
   return appLayout(user, 'quotes', isNew ? 'New quote' : `${q.number} ${q.title}`, content);
 }
 
@@ -335,14 +335,14 @@ ${saved ? '<div class="ok-box">Saved.</div>' : ''}
     <div class="card card-pad">
       <h2>Rate card</h2>
       <p class="muted small">Your standard services. Claude prices quotes from these.</p>
-      <table class="items-table"><thead><tr><th style="width:38%">Service</th><th>Unit</th><th>Price</th><th>Notes</th><th></th></tr></thead><tbody id="rates"></tbody></table>
+      <table class="items-table"><thead><tr><th>Service</th><th class="c-unit">Unit</th><th class="c-price">Price</th><th>Notes</th><th class="c-del"></th></tr></thead><tbody id="rates"></tbody></table>
       <button type="button" class="btn" id="add-rate" style="margin-top:8px">+ Add service</button>
     </div>
   </div>
   <aside class="side"><div class="card card-pad"><button class="btn primary block" type="submit">Save</button><p class="small muted" style="margin:10px 0 0">Tip: you can also tell Claude “Update my QuoteLink rate card: logo design $1,200…”.</p></div></aside>
 </form>
 <script>window.QL = ${JSON.stringify({ settings: true, rateCard }).replace(/</g, '\\u003c')};</script>
-<script src="/static/app.js?v=14"></script>`;
+<script src="/static/app.js?v=16"></script>`;
   return appLayout(user, 'settings', 'Business & rates', content);
 }
 
@@ -387,7 +387,7 @@ function connect(user, { mcpUrl }) {
     </div>
   </aside>
 </div>
-<script src="/static/app.js?v=14"></script>`;
+<script src="/static/app.js?v=16"></script>`;
   return appLayout(user, 'connect', 'Connect Claude', content);
 }
 
@@ -468,7 +468,7 @@ ${isOwnerPreview ? `<div class="preview-bar">${quote.status === 'draft' ? 'Draft
   <div class="row no-print" style="justify-content:center;margin-top:16px"><button class="btn ghost small" onclick="window.print()">Download / print PDF</button></div>
   <div class="powered no-print">Sent with <a href="/">QuoteLink</a></div>
 </div>
-${!answered ? `<script>window.QL = ${JSON.stringify({ slug: quote.slug, publicView: true, signer: quote.client_name || null }).replace(/</g, '\\u003c')};</script><script src="/static/app.js?v=14"></script>` : ''}`,
+${!answered ? `<script>window.QL = ${JSON.stringify({ slug: quote.slug, publicView: true, signer: quote.client_name || null }).replace(/</g, '\\u003c')};</script><script src="/static/app.js?v=16"></script>` : ''}`,
   });
 }
 
